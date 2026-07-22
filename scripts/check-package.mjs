@@ -20,15 +20,22 @@ check(packageJson.publishConfig?.access === 'public', 'package must publish with
 const skillVersion = skill.match(/^\s*version:\s*["']?([^"'\s]+)["']?\s*$/m)?.[1]
 check(skillVersion === packageJson.version, `SKILL.md version ${skillVersion || '<missing>'} must match package version ${packageJson.version}`)
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const packed = spawnSync(npmCommand, ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+const packArguments = ['pack', '--dry-run', '--json', '--ignore-scripts']
+const npmExecPath = process.env.npm_execpath
+const npmCommand = npmExecPath
+  ? process.execPath
+  : process.platform === 'win32' ? 'cmd.exe' : 'npm'
+const npmArguments = npmExecPath
+  ? [npmExecPath, ...packArguments]
+  : process.platform === 'win32' ? ['/d', '/s', '/c', `npm ${packArguments.join(' ')}`] : packArguments
+const packed = spawnSync(npmCommand, npmArguments, {
   cwd: root,
   encoding: 'utf8',
   env: process.env,
 })
 
 if (packed.status !== 0) {
-  failures.push(`npm pack --dry-run failed: ${packed.stderr || packed.stdout}`)
+  failures.push(`npm pack --dry-run failed: ${packed.error?.message || packed.stderr || packed.stdout}`)
 }
 else {
   const output = packed.stdout.trim()
