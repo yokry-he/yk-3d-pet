@@ -1,0 +1,1 @@
+Validate the requested 3D pet directory with the deterministic validator, target repository checks, and the four-view matrix. Separate automated success from actually observed WebGL, audio, browser-extension, and synchronization results.

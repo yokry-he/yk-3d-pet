@@ -1,0 +1,33 @@
+{
+  "name": "yk-3d-pet",
+  "version": "0.1.0",
+  "description": "Cross-agent Skill and deterministic toolkit for procedural 3D pet authoring.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "yk-3d-pet": "./scripts/cli.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "references",
+    "templates",
+    "schemas",
+    "prompts",
+    "scripts",
+    "adapters",
+    "examples",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node scripts/check-skill.mjs && node scripts/check-agent-adapters.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "smoke": "node scripts/check-skill.mjs",
+    "scaffold": "node scripts/cli.mjs scaffold",
+    "validate": "node scripts/cli.mjs validate"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

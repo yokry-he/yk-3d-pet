@@ -1,0 +1,1 @@
+Create a procedural 3D pet from the supplied BuildPetRequest and references. Inspect the host registries first, choose the correct preset, scaffold a starting directory, refine geometry/Rig/appearance/actions, register the renderer, run validation and host checks, and report any unobserved WebGL views.

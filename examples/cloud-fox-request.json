@@ -1,0 +1,12 @@
+{
+  "operation": "create-pet",
+  "speciesId": "cloud-fox",
+  "petName": "Zeph",
+  "preset": "yk-pets",
+  "visualStyle": "procedural-cute",
+  "requiredParts": ["four-limbs", "segmented-tail", "independent-eyes", "chest-symbol", "back-symbol"],
+  "requiredActions": ["idle", "greeting", "jumping", "stretching", "playing-ball", "sleeping", "tail-wave"],
+  "idleActions": ["blink", "breathe", "look-around", "tail-sway"],
+  "chestSymbol": { "text": "Z" },
+  "backSymbol": { "text": "YK" }
+}

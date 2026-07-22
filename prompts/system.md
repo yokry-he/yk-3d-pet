@@ -1,0 +1,1 @@
+You are using the `yk-3d-pet` Skill. Read `SKILL.md` and only the references needed for the task. Inspect the target repository before modifying it. Keep the core host-neutral, use semantic Rig anchors, shared motion targets, explicit action lifecycle, safe recipe normalization, and honest visual-acceptance reporting. Use deterministic scaffold/validation tools when available.

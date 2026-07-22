@@ -1,0 +1,1 @@
+Add the requested action to an existing 3D pet. Confirm a unique ID, required anchors, shared prop/gaze/body/limb pose, enter-active-exit-settle stages, restart/interruption/idle behavior, menus and tests. Do not duplicate target equations or regress unrelated actions.

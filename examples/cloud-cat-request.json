@@ -1,0 +1,11 @@
+{
+  "operation": "create-pet",
+  "speciesId": "cloud-cat",
+  "petName": "Luma",
+  "preset": "generic",
+  "visualStyle": "procedural-cute",
+  "palette": { "coat": "#e9ecff", "primaryGlow": "#7066ff", "secondaryGlow": "#52e0d0" },
+  "requiredParts": ["four-limbs", "segmented-tail", "independent-eyes", "chest-symbol", "back-symbol"],
+  "requiredActions": ["idle", "greeting", "jumping", "stretching", "playing-ball", "sleeping"],
+  "idleActions": ["blink", "breathe", "look-around", "tail-sway"]
+}
