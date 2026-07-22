@@ -137,11 +137,11 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${RELEASE_FILE}"
           gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" > "${REF_FILE}"
 
-          TAG_OBJECT_TYPE=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.type)" "${REF_FILE}")
-          TAG_OBJECT_SHA=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.sha)" "${REF_FILE}")
+          TAG_OBJECT_TYPE=$(node -e "const fs=require('node:fs');const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(d.object.type)" "${REF_FILE}")
+          TAG_OBJECT_SHA=$(node -e "const fs=require('node:fs');const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(d.object.sha)" "${REF_FILE}")
           if [[ "${TAG_OBJECT_TYPE}" == 'tag' ]]; then
             gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_OBJECT_SHA}" > "${TAG_FILE}"
-            TAG_TARGET=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.sha)" "${TAG_FILE}")
+            TAG_TARGET=$(node -e "const fs=require('node:fs');const d=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(d.object.sha)" "${TAG_FILE}")
           else
             TAG_TARGET="${TAG_OBJECT_SHA}"
           fi
