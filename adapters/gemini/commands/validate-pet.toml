@@ -1,0 +1,2 @@
+description = "Validate a procedural 3D pet with yk-3d-pet"
+prompt = "Read SKILL.md and validate the requested pet directory. Separate automated checks from observed WebGL results: {{args}}"

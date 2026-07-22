@@ -1,0 +1,2 @@
+description = "Create a procedural 3D pet with yk-3d-pet"
+prompt = "Read SKILL.md and create the requested pet. Normalize this request and use the deterministic scaffold and validator: {{args}}"

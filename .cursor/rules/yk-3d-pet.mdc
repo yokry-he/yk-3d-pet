@@ -1,0 +1,6 @@
+---
+description: Create, modify, integrate, or validate procedural 3D pets with semantic rigs, actions, idle behaviors, symbols, recipes, and renderer adapters.
+alwaysApply: false
+---
+
+Read and follow `SKILL.md`. Use `scripts/cli.mjs scaffold` and `scripts/cli.mjs validate`. Preserve host architecture and report unobserved visual checks honestly.
