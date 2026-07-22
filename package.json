@@ -2,7 +2,30 @@
   "name": "yk-3d-pet",
   "version": "0.1.0",
   "description": "Cross-agent Skill and deterministic toolkit for procedural 3D pet authoring.",
+  "keywords": [
+    "agent-skill",
+    "3d-pet",
+    "threejs",
+    "tresjs",
+    "rigging",
+    "animation",
+    "codex",
+    "claude",
+    "copilot",
+    "gemini",
+    "cursor",
+    "windsurf"
+  ],
   "license": "Apache-2.0",
+  "author": "yokry-he",
+  "homepage": "https://github.com/yokry-he/yk-3d-pet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yokry-he/yk-3d-pet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yokry-he/yk-3d-pet/issues"
+  },
   "type": "module",
   "bin": {
     "yk-3d-pet": "./scripts/cli.mjs"
@@ -16,16 +39,24 @@
     "scripts",
     "adapters",
     "examples",
+    "docs",
     "README.md",
     "README.zh-CN.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
-    "check": "node scripts/check-skill.mjs && node scripts/check-agent-adapters.mjs",
+    "check": "node scripts/check-skill.mjs && node scripts/check-agent-adapters.mjs && node scripts/check-package.mjs",
+    "check:package": "node scripts/check-package.mjs",
     "test": "node --test tests/*.test.mjs",
     "smoke": "node scripts/check-skill.mjs",
+    "release:check": "npm test && npm run check",
+    "prepublishOnly": "npm run release:check",
     "scaffold": "node scripts/cli.mjs scaffold",
     "validate": "node scripts/cli.mjs validate"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=22"
