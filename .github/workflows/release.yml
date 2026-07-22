@@ -1,0 +1,78 @@
+name: Release yk-3d-pet
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Run tests
+        run: npm test
+
+      - name: Validate Skill and package
+        run: npm run check
+
+      - name: Verify release version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version v${VERSION}." >&2
+            exit 1
+          fi
+
+      - name: Build release package
+        id: package
+        shell: bash
+        run: |
+          PACKAGE=$(npm pack --json --ignore-scripts | node -e "let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>process.stdout.write(JSON.parse(input)[0].filename))")
+          sha256sum "$PACKAGE" > "$PACKAGE.sha256"
+          echo "file=${PACKAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: yk-3d-pet-${{ steps.version.outputs.version }}
+          path: |
+            ${{ steps.package.outputs.file }}
+            ${{ steps.package.outputs.file }}.sha256
+          if-no-files-found: error
+
+      - name: Publish to npm
+        if: startsWith(github.ref, 'refs/tags/v') && vars.NPM_PUBLISH_ENABLED == 'true'
+        run: npm publish "${{ steps.package.outputs.file }}" --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${{ steps.package.outputs.file }}" \
+            "${{ steps.package.outputs.file }}.sha256" \
+            --verify-tag \
+            --title "yk-3d-pet ${GITHUB_REF_NAME}" \
+            --generate-notes
