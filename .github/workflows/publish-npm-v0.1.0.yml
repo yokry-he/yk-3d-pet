@@ -1,0 +1,222 @@
+name: Publish yk-3d-pet v0.1.0 to npm
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-npm-v0.1.0.yml'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-publish-yk-3d-pet-v0.1.0
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: 3303319cbf8f3b48cf91d06138f56ee112ce3c70
+  RELEASE_TAG: v0.1.0
+  PACKAGE_NAME: yk-3d-pet
+  PACKAGE_VERSION: 0.1.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout immutable release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Use current npm 11
+        run: npm install --global npm@11
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
+          git fetch --force --tags origin
+          test "$(git rev-list -n 1 "${RELEASE_TAG}")" = "${RELEASE_SHA}"
+          test "$(node -p "require('./package.json').name")" = "${PACKAGE_NAME}"
+          test "$(node -p "require('./package.json').version")" = "${PACKAGE_VERSION}"
+          grep -Eq '^name: yk-3d-pet$' SKILL.md
+          grep -Eq '^  version: "0.1.0"$' SKILL.md
+
+      - name: Run release checks
+        run: npm run release:check
+
+      - name: Build checked package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE=$(npm pack --json --ignore-scripts | node -e "let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>process.stdout.write(JSON.parse(input)[0].filename))")
+          sha256sum "${PACKAGE}" > "${PACKAGE}.sha256"
+          echo "file=${PACKAGE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Attempt npm publication
+        id: publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_FILE: ${{ steps.package.outputs.file }}
+        shell: bash
+        run: |
+          set -u
+          RESULT_DIR="${RUNNER_TEMP}/yk-3d-pet-npm-publish"
+          mkdir -p "${RESULT_DIR}"
+          OUTPUT_FILE="${RESULT_DIR}/publish-output.log"
+          AUTH_MODE='trusted-publishing'
+          EXIT_CODE=0
+          STATUS='not-attempted'
+
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            STATUS='already-published'
+          else
+            if [[ -n "${NODE_AUTH_TOKEN:-}" ]]; then
+              AUTH_MODE='token'
+              set +e
+              npm publish "${PACKAGE_FILE}" --access public --provenance >"${OUTPUT_FILE}" 2>&1
+              EXIT_CODE=$?
+              set -e
+            else
+              unset NODE_AUTH_TOKEN
+              set +e
+              npm publish "${PACKAGE_FILE}" --access public >"${OUTPUT_FILE}" 2>&1
+              EXIT_CODE=$?
+              set -e
+            fi
+            if [[ "${EXIT_CODE}" -eq 0 ]]; then
+              STATUS='publish-command-succeeded'
+            else
+              STATUS='publish-command-failed'
+            fi
+          fi
+
+          printf '%s' "${AUTH_MODE}" > "${RESULT_DIR}/auth-mode"
+          printf '%s' "${EXIT_CODE}" > "${RESULT_DIR}/exit-code"
+          printf '%s' "${STATUS}" > "${RESULT_DIR}/status"
+          echo "auth_mode=${AUTH_MODE}" >> "${GITHUB_OUTPUT}"
+          echo "command_status=${STATUS}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify npm registry
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_DIR="${RUNNER_TEMP}/yk-3d-pet-npm-publish"
+          PUBLISHED=false
+          VERSION=''
+          for attempt in 1 2 3 4 5 6; do
+            if VERSION=$(npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version 2>/dev/null); then
+              PUBLISHED=true
+              break
+            fi
+            sleep 5
+          done
+          printf '%s' "${PUBLISHED}" > "${RESULT_DIR}/published"
+          printf '%s' "${VERSION}" > "${RESULT_DIR}/registry-version"
+          echo "published=${PUBLISHED}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write npm publication receipt
+        if: always() && !cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_FILE: ${{ steps.package.outputs.file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_DIR="${RUNNER_TEMP}/yk-3d-pet-npm-publish"
+          RECEIPT_FILE=$(mktemp)
+          AUTH_MODE=$(cat "${RESULT_DIR}/auth-mode" 2>/dev/null || printf 'unknown')
+          EXIT_CODE=$(cat "${RESULT_DIR}/exit-code" 2>/dev/null || printf '1')
+          COMMAND_STATUS=$(cat "${RESULT_DIR}/status" 2>/dev/null || printf 'unknown')
+          PUBLISHED=$(cat "${RESULT_DIR}/published" 2>/dev/null || printf 'false')
+          REGISTRY_VERSION=$(cat "${RESULT_DIR}/registry-version" 2>/dev/null || true)
+          OUTPUT_FILE="${RESULT_DIR}/publish-output.log"
+          ERROR_CATEGORY='none'
+          ERROR_CODE=''
+
+          if [[ "${PUBLISHED}" != 'true' ]]; then
+            ERROR_CATEGORY='unknown'
+            if [[ -f "${OUTPUT_FILE}" ]]; then
+              ERROR_CODE=$(grep -Eio 'npm (error|ERR!)[[:space:]]+code[[:space:]]+[A-Z0-9_]+' "${OUTPUT_FILE}" | tail -1 | awk '{print $NF}' || true)
+              if grep -Eqi 'ENEEDAUTH|need auth|not logged in' "${OUTPUT_FILE}"; then ERROR_CATEGORY='authentication-required'; fi
+              if grep -Eqi 'EOTP|one-time password|two-factor' "${OUTPUT_FILE}"; then ERROR_CATEGORY='two-factor-required'; fi
+              if grep -Eqi 'trusted publish|trusted publisher|OIDC' "${OUTPUT_FILE}"; then ERROR_CATEGORY='trusted-publisher-not-authorized'; fi
+              if grep -Eqi 'E403|forbidden|permission' "${OUTPUT_FILE}"; then ERROR_CATEGORY='permission-or-name-policy'; fi
+              if grep -Eqi 'EPUBLISHCONFLICT|cannot publish over' "${OUTPUT_FILE}"; then ERROR_CATEGORY='version-conflict'; fi
+            fi
+          fi
+
+          export AUTH_MODE EXIT_CODE COMMAND_STATUS PUBLISHED REGISTRY_VERSION ERROR_CATEGORY ERROR_CODE RECEIPT_FILE PACKAGE_FILE
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const crypto = require('node:crypto')
+          const packageFile = process.env.PACKAGE_FILE || null
+          let packageDigest = null
+          let packageSize = null
+          if (packageFile && fs.existsSync(packageFile)) {
+            const bytes = fs.readFileSync(packageFile)
+            packageDigest = `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`
+            packageSize = bytes.length
+          }
+          const receipt = {
+            schemaVersion: 1,
+            package: 'yk-3d-pet',
+            version: '0.1.0',
+            releaseTag: 'v0.1.0',
+            releaseCommit: process.env.RELEASE_SHA,
+            githubRelease: 'https://github.com/yokry-he/yk-3d-pet/releases/tag/v0.1.0',
+            npmPublished: process.env.PUBLISHED === 'true',
+            npmVersion: process.env.REGISTRY_VERSION || null,
+            authModeAttempted: process.env.AUTH_MODE,
+            commandStatus: process.env.COMMAND_STATUS,
+            commandExitCode: Number(process.env.EXIT_CODE || 1),
+            errorCategory: process.env.ERROR_CATEGORY,
+            npmErrorCode: process.env.ERROR_CODE || null,
+            packageAsset: packageFile ? path.basename(packageFile) : null,
+            packageSize,
+            packageDigest,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            verifiedAt: new Date().toISOString(),
+          }
+          fs.writeFileSync(process.env.RECEIPT_FILE, `${JSON.stringify(receipt, null, 2)}\n`)
+          NODE
+
+          RECEIPT_PATH='release-receipts/npm-v0.1.0.json'
+          EXISTING_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}?ref=main" --jq '.sha' 2>/dev/null || true)
+          ENCODED=$(base64 -w 0 "${RECEIPT_FILE}")
+          if [[ -n "${EXISTING_SHA}" ]]; then
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}" \
+              -f message='chore: update npm v0.1.0 publication receipt' \
+              -f content="${ENCODED}" \
+              -f branch='main' \
+              -f sha="${EXISTING_SHA}" >/dev/null
+          else
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}" \
+              -f message='chore: record npm v0.1.0 publication receipt' \
+              -f content="${ENCODED}" \
+              -f branch='main' >/dev/null
+          fi
+
+      - name: Require successful publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBLISHED=$(cat "${RUNNER_TEMP}/yk-3d-pet-npm-publish/published" 2>/dev/null || printf 'false')
+          if [[ "${PUBLISHED}" != 'true' ]]; then
+            echo 'yk-3d-pet@0.1.0 is not visible in the npm registry.' >&2
+            exit 1
+          fi
