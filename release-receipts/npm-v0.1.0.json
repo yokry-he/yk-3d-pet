@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "package": "yk-3d-pet",
+  "version": "0.1.0",
+  "releaseTag": "v0.1.0",
+  "releaseCommit": "3303319cbf8f3b48cf91d06138f56ee112ce3c70",
+  "githubRelease": "https://github.com/yokry-he/yk-3d-pet/releases/tag/v0.1.0",
+  "npmPublished": false,
+  "npmVersion": null,
+  "authModeAttempted": "trusted-publishing",
+  "commandStatus": "publish-command-failed",
+  "commandExitCode": 1,
+  "errorCategory": "permission-or-name-policy",
+  "npmErrorCode": "E404",
+  "packageAsset": "yk-3d-pet-0.1.0.tgz",
+  "packageSize": 26738,
+  "packageDigest": "sha256:bbaa905a0f07fa3786671f332a29920e0b77ad18b856de053cf971448f8cd09a",
+  "workflowRunId": "29943525841",
+  "verifiedAt": "2026-07-22T17:43:47.905Z"
+}
