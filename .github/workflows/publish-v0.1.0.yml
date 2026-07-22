@@ -1,0 +1,139 @@
+name: Publish yk-3d-pet v0.1.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v0.1.0.yml'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish-yk-3d-pet-v0.1.0
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: 3303319cbf8f3b48cf91d06138f56ee112ce3c70
+  RELEASE_TAG: v0.1.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout validated release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify immutable release target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RELEASE_SHA}"
+          VERSION=$(node -p "require('./package.json').version")
+          test "${RELEASE_TAG}" = "v${VERSION}"
+          grep -Eq '^name: yk-3d-pet$' SKILL.md
+          grep -Eq '^  version: "0.1.0"$' SKILL.md
+
+      - name: Run release checks
+        run: npm run release:check
+
+      - name: Build checked tarball
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE=$(npm pack --json --ignore-scripts | node -e "let input='';process.stdin.on('data',chunk=>input+=chunk).on('end',()=>process.stdout.write(JSON.parse(input)[0].filename))")
+          sha256sum "${PACKAGE}" > "${PACKAGE}.sha256"
+          echo "file=${PACKAGE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create or verify annotated tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            TAG_TARGET=$(git rev-list -n 1 "${RELEASE_TAG}")
+            test "${TAG_TARGET}" = "${RELEASE_SHA}" || {
+              echo "${RELEASE_TAG} points to ${TAG_TARGET}, expected ${RELEASE_SHA}." >&2
+              exit 1
+            }
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git tag -a "${RELEASE_TAG}" "${RELEASE_SHA}" -m "yk-3d-pet ${RELEASE_TAG}"
+            git push origin "refs/tags/${RELEASE_TAG}"
+          fi
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yk-3d-pet-0.1.0
+          path: |
+            ${{ steps.package.outputs.file }}
+            ${{ steps.package.outputs.file }}.sha256
+          if-no-files-found: error
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_FILE: ${{ steps.package.outputs.file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${PACKAGE_FILE}" "${PACKAGE_FILE}.sha256" --clobber
+          else
+            gh release create "${RELEASE_TAG}" \
+              "${PACKAGE_FILE}" \
+              "${PACKAGE_FILE}.sha256" \
+              --verify-tag \
+              --target "${RELEASE_SHA}" \
+              --title "yk-3d-pet ${RELEASE_TAG}" \
+              --generate-notes
+          fi
+
+      - name: Publish to npm when explicitly enabled
+        if: vars.NPM_PUBLISH_ENABLED == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_FILE: ${{ steps.package.outputs.file }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "yk-3d-pet@${VERSION}" version >/dev/null 2>&1; then
+            echo "yk-3d-pet@${VERSION} is already published; skipping."
+          else
+            test -n "${NODE_AUTH_TOKEN:-}" || {
+              echo "NPM_PUBLISH_ENABLED=true but NPM_TOKEN is not configured." >&2
+              exit 1
+            }
+            npm publish "${PACKAGE_FILE}" --access public --provenance
+          fi
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo '## yk-3d-pet v0.1.0 publication'
+            echo
+            echo "- Tag: ${RELEASE_TAG}"
+            echo "- Commit: ${RELEASE_SHA}"
+            echo '- GitHub Release: created or updated'
+            if [[ "${{ vars.NPM_PUBLISH_ENABLED }}" == 'true' ]]; then
+              echo '- npm: enabled'
+            else
+              echo '- npm: skipped because NPM_PUBLISH_ENABLED is not true'
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
