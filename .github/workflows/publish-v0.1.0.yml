@@ -122,7 +122,88 @@ jobs:
             npm publish "${PACKAGE_FILE}" --access public --provenance
           fi
 
+      - name: Write immutable publication receipt
+        if: always() && !cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_FILE=$(mktemp)
+          REF_FILE=$(mktemp)
+          TAG_FILE=$(mktemp)
+          RECEIPT_FILE=$(mktemp)
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${RELEASE_FILE}"
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" > "${REF_FILE}"
+
+          TAG_OBJECT_TYPE=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.type)" "${REF_FILE}")
+          TAG_OBJECT_SHA=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.sha)" "${REF_FILE}")
+          if [[ "${TAG_OBJECT_TYPE}" == 'tag' ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/git/tags/${TAG_OBJECT_SHA}" > "${TAG_FILE}"
+            TAG_TARGET=$(node -e "const d=require(process.argv[1]);process.stdout.write(d.object.sha)" "${TAG_FILE}")
+          else
+            TAG_TARGET="${TAG_OBJECT_SHA}"
+          fi
+          test "${TAG_TARGET}" = "${RELEASE_SHA}"
+
+          NPM_PUBLISHED=false
+          NPM_VERSION=''
+          if NPM_VERSION=$(npm view 'yk-3d-pet@0.1.0' version 2>/dev/null); then
+            NPM_PUBLISHED=true
+          fi
+
+          export RELEASE_FILE RECEIPT_FILE TAG_TARGET NPM_PUBLISHED NPM_VERSION
+          node <<'NODE'
+          const fs = require('node:fs')
+          const release = JSON.parse(fs.readFileSync(process.env.RELEASE_FILE, 'utf8'))
+          const receipt = {
+            schemaVersion: 1,
+            package: 'yk-3d-pet',
+            version: '0.1.0',
+            tag: 'v0.1.0',
+            releaseCommit: process.env.RELEASE_SHA,
+            tagTarget: process.env.TAG_TARGET,
+            githubRelease: {
+              id: release.id,
+              url: release.html_url,
+              name: release.name,
+              draft: release.draft,
+              prerelease: release.prerelease,
+              publishedAt: release.published_at,
+              assets: release.assets.map(asset => ({
+                name: asset.name,
+                size: asset.size,
+                digest: asset.digest || null,
+                downloadUrl: asset.browser_download_url,
+              })),
+            },
+            npmPublished: process.env.NPM_PUBLISHED === 'true',
+            npmVersion: process.env.NPM_VERSION || null,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            verifiedAt: new Date().toISOString(),
+          }
+          fs.writeFileSync(process.env.RECEIPT_FILE, `${JSON.stringify(receipt, null, 2)}\n`)
+          NODE
+
+          RECEIPT_PATH='release-receipts/v0.1.0.json'
+          EXISTING_SHA=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}?ref=main" --jq '.sha' 2>/dev/null || true)
+          ENCODED=$(base64 -w 0 "${RECEIPT_FILE}")
+          if [[ -n "${EXISTING_SHA}" ]]; then
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}" \
+              -f message='chore: update v0.1.0 publication receipt' \
+              -f content="${ENCODED}" \
+              -f branch='main' \
+              -f sha="${EXISTING_SHA}" >/dev/null
+          else
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/${RECEIPT_PATH}" \
+              -f message='chore: record v0.1.0 publication receipt' \
+              -f content="${ENCODED}" \
+              -f branch='main' >/dev/null
+          fi
+
       - name: Publish summary
+        if: always()
         shell: bash
         run: |
           {
