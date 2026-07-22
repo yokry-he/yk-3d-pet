@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "package": "yk-3d-pet",
+  "version": "0.1.0",
+  "tag": "v0.1.0",
+  "releaseCommit": "3303319cbf8f3b48cf91d06138f56ee112ce3c70",
+  "tagTarget": "3303319cbf8f3b48cf91d06138f56ee112ce3c70",
+  "githubRelease": {
+    "id": 358193993,
+    "url": "https://github.com/yokry-he/yk-3d-pet/releases/tag/v0.1.0",
+    "name": "yk-3d-pet v0.1.0",
+    "draft": false,
+    "prerelease": false,
+    "publishedAt": "2026-07-22T17:22:56Z",
+    "assets": [
+      {
+        "name": "yk-3d-pet-0.1.0.tgz",
+        "size": 26738,
+        "digest": "sha256:bbaa905a0f07fa3786671f332a29920e0b77ad18b856de053cf971448f8cd09a",
+        "downloadUrl": "https://github.com/yokry-he/yk-3d-pet/releases/download/v0.1.0/yk-3d-pet-0.1.0.tgz"
+      },
+      {
+        "name": "yk-3d-pet-0.1.0.tgz.sha256",
+        "size": 86,
+        "digest": "sha256:47964a9a31a66e040fc5f01d7866de230a9058b010c2eb370061d036595ec070",
+        "downloadUrl": "https://github.com/yokry-he/yk-3d-pet/releases/download/v0.1.0/yk-3d-pet-0.1.0.tgz.sha256"
+      }
+    ]
+  },
+  "npmPublished": false,
+  "npmVersion": null,
+  "workflowRunId": "29942474112",
+  "verifiedAt": "2026-07-22T17:28:36.499Z"
+}
