@@ -1,0 +1,16 @@
+/** Generic Vue renderer adapter. Map this interface to the host's registry. */
+import { createApp, type App, type Component } from 'vue'
+import __PASCAL_NAME__Rig from './__PASCAL_NAME__Rig.vue'
+import { __CONSTANT_NAME___RENDERER_ID, __CONSTANT_NAME___SPECIES_ID, normalize__PASCAL_NAME__Appearance } from './definition'
+export interface GenericRenderState { behavior: string; appearance: unknown; renderProps?: Record<string, unknown> }
+export interface GenericRendererInstance { update(state: GenericRenderState): void; destroy(): void }
+export interface GenericRendererAdapter { id: string; supports(speciesId: string): boolean; mount(host: HTMLElement, state: GenericRenderState): GenericRendererInstance }
+export const __CONSTANT_NAME___RENDERER_ADAPTER: GenericRendererAdapter = {
+  id: __CONSTANT_NAME___RENDERER_ID,
+  supports: speciesId => speciesId === __CONSTANT_NAME___SPECIES_ID,
+  mount(host, initialState) {
+    let state = initialState; let app: App<Element> | null = null
+    const mount = () => { app?.unmount(); host.replaceChildren(); app = createApp(__PASCAL_NAME__Rig as Component, { appearance: normalize__PASCAL_NAME__Appearance(state.appearance), behavior: state.behavior, ...(state.renderProps || {}) }); app.mount(host) }
+    mount(); return { update(next) { state = next; mount() }, destroy() { app?.unmount(); app = null; host.replaceChildren() } }
+  },
+}
